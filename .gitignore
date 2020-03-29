@@ -1,0 +1,4 @@
+.coverage
+.tox/
+__pycache__/
+htmlcov/

@@ -1,0 +1,2 @@
+python-consul2>=0.0.16
+requests
