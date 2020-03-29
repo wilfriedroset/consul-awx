@@ -1,4 +1,5 @@
 # Consul inventory source for AWX/Tower
+[![Build Status](https://travis-ci.org/wilfriedroset/consul-awx.svg?branch=master)](https://travis-ci.org/wilfriedroset/consul-awx)
 
 Aims to provide an inventory script for
 [AWX/Tower](https://docs.ansible.com/ansible-tower/latest/html/userguide/inventories.html)
