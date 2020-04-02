@@ -5,6 +5,7 @@ import copy
 import json
 import logging
 import os
+import re
 import sys
 from urllib.parse import urlparse
 
@@ -95,6 +96,11 @@ class ConsulInventory:
         self.inventory["all"]["children"].sort()
 
     def add_to_group(self, group, host, parent=None):
+        # Sanitize group name:
+        # https://docs.ansible.com/ansible/latest/network/getting_started/first_inventory.html
+        # Avoid spaces, hyphens, and preceding numbers (use floor_19, not
+        # 19th_floor) in your group names. Group names are case sensitive.
+        group = re.sub(r"[^A-Za-z0-9]", "_", group)
         if group not in self.inventory:
             self.inventory[group] = copy.deepcopy(EMPTY_GROUP)
         self.inventory[group]["hosts"].append(host)
