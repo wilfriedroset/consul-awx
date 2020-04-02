@@ -53,6 +53,7 @@ class ConsulInventory:
     def build_full_inventory(self):
         for node in self.get_nodes():
             self.inventory["_meta"]["hostvars"][node["Node"]] = get_node_vars(node)
+            self.add_to_group(node["Datacenter"], node["Node"])
             meta = node.get("Meta", {})
             if meta is None:
                 meta = {}
