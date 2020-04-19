@@ -1,7 +1,10 @@
+import os
+import tempfile
 from pprint import pprint as print
 from unittest import mock
 
-from consul_awx import ConsulInventory
+import pytest
+from consul_awx import ConsulInventory, get_node_meta
 
 
 @mock.patch("consul.base.Consul.Catalog.node")
@@ -122,3 +125,24 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
         "server_type_postgresql": {"children": [], "hosts": ["node1"]},
         "ungrouped": {"children": [], "hosts": []},
     }
+
+
+def test_get_node_meta_envvar():
+    assert get_node_meta() is None
+    os.environ["CONSUL_NODE_META"] = '{"foo": "bar"}'
+    assert get_node_meta() == {"foo": "bar"}
+    for wrong_value in ['{"foo": 1}', '{1: "bar"}', "not a dict"]:
+        with pytest.raises(Exception):
+            os.environ["CONSUL_NODE_META"] = wrong_value
+            get_node_meta()
+    del os.environ["CONSUL_NODE_META"]
+
+
+def test_get_node_meta_configfile():
+    with tempfile.NamedTemporaryFile() as fp:
+        fp.write(b"[consul_node_meta]\nk1:v1")
+        fp.seek(0)
+        print(dir(fp))
+        print(fp.name)
+        path = fp.name
+        assert get_node_meta(path) == {"k1": "v1"}

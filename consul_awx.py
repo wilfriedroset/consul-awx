@@ -50,8 +50,8 @@ class ConsulInventory:
 
         self.inventory = copy.deepcopy(EMPTY_INVENTORY)
 
-    def build_full_inventory(self):
-        for node in self.get_nodes():
+    def build_full_inventory(self, node_meta=None):
+        for node in self.get_nodes(node_meta=node_meta):
             self.inventory["_meta"]["hostvars"][node["Node"]] = get_node_vars(node)
             self.add_to_group(node["Datacenter"], node["Node"])
             meta = node.get("Meta", {})
@@ -106,9 +106,13 @@ class ConsulInventory:
             self.inventory[group] = copy.deepcopy(EMPTY_GROUP)
         self.inventory[group]["hosts"].append(host)
 
-    def get_nodes(self, datacenter=None):
-        logging.debug("getting all nodes for datacenter: %s", datacenter)
-        return self.consul_api.catalog.nodes(dc=datacenter)[1]
+    def get_nodes(self, datacenter=None, node_meta=None):
+        logging.debug(
+            "getting all nodes for datacenter: %s, with node_meta: %s",
+            datacenter,
+            node_meta,
+        )
+        return self.consul_api.catalog.nodes(dc=datacenter, node_meta=node_meta)[1]
 
     def get_node(self, node):
         logging.debug("getting node info for node: %s", node)
@@ -239,6 +243,39 @@ def get_client_configuration(config_path=DEFAULT_CONFIG_PATH):
     return consul_config
 
 
+def get_node_meta(config_path=None):
+    node_meta = None
+    if "CONSUL_NODE_META" in os.environ:
+        try:
+            node_meta = json.loads(os.environ["CONSUL_NODE_META"])
+
+            assert isinstance(node_meta, dict)  # node_meta must be dict
+            assert all(
+                isinstance(x, str) for x in node_meta.keys()
+            )  # all keys must be string
+            assert all(
+                isinstance(x, str) for x in node_meta.values()
+            )  # all values must be string
+
+        except (json.decoder.JSONDecodeError) as err:
+            logging.fatal(str(err))
+            raise json.decoder.JSONDecodeError("failed to load CONSUL_NODE_META")
+        except AssertionError:
+            raise Exception(
+                "Invalid node_meta filter. Content must be dict with keys and values as string"
+            )
+    elif config_path and os.path.isfile(config_path):
+        config = configparser.ConfigParser()
+        config.read(config_path)
+        if config.has_section("consul_node_meta"):
+            node_meta = dict(config.items("consul_node_meta"))
+    else:
+        logging.debug(
+            "No envvar nor configuration file, will not use node_meta to filter"
+        )
+    return node_meta
+
+
 def main():
     args = cmdline_parser()
     consul_config = get_client_configuration(args.path)
@@ -249,7 +286,8 @@ def main():
         if args.host:
             result = get_node_vars(c.get_node(args.host)["Node"])
         else:
-            c.build_full_inventory()
+            node_meta = get_node_meta(args.path)
+            c.build_full_inventory(node_meta)
             result = c.inventory
     except ConnectionError as err:
         logging.debug(str(err))
