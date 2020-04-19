@@ -247,7 +247,7 @@ def main():
 
     try:
         if args.host:
-            result = get_host_var(c.get_node(args.host)["Node"])
+            result = get_node_vars(c.get_node(args.host)["Node"])
         else:
             c.build_full_inventory()
             result = c.inventory
