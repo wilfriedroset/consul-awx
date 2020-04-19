@@ -217,10 +217,8 @@ def str2bool(v):
         raise ValueError
 
 
-def main():
-    args = cmdline_parser()
+def get_client_configuration(config_path=DEFAULT_CONFIG_PATH):
     consul_config = {}
-
     if "CONSUL_URL" in os.environ:
         consul_url = os.environ["CONSUL_URL"]
         url = urlparse(consul_url)
@@ -231,13 +229,19 @@ def main():
             "verify": str2bool(os.environ.get("CONSUL_SSL_VERIFY", True)),
             "token": os.environ.get("CONSUL_TOKEN"),
         }
-    elif os.path.isfile(args.path):
+    elif os.path.isfile(config_path):
         config = configparser.ConfigParser()
-        config.read(args.path)
+        config.read(config_path)
         if config.has_section("consul"):
             consul_config = dict(config.items("consul"))
     else:
         logging.debug("No envvar nor configuration file, will use default values")
+    return consul_config
+
+
+def main():
+    args = cmdline_parser()
+    consul_config = get_client_configuration(args.path)
 
     c = ConsulInventory(**consul_config)
 
