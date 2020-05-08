@@ -82,6 +82,7 @@ class ConsulInventory:
             # Build node services by using the service's name as group name
             services = self.get_node_services(node["Node"])
             for service, data in services.items():
+                service = sanitize(service)
                 self.add_to_group(service, node["Node"])
                 for tag in data["Tags"]:
                     self.add_to_group(f"{service}_{tag}", node["Node"])
@@ -97,11 +98,7 @@ class ConsulInventory:
         self.inventory["all"]["children"].sort()
 
     def add_to_group(self, group, host, parent=None):
-        # Sanitize group name:
-        # https://docs.ansible.com/ansible/latest/network/getting_started/first_inventory.html
-        # Avoid spaces, hyphens, and preceding numbers (use floor_19, not
-        # 19th_floor) in your group names. Group names are case sensitive.
-        group = re.sub(r"[^A-Za-z0-9]", "_", group)
+        group = sanitize(group)
         if group not in self.inventory:
             self.inventory[group] = copy.deepcopy(EMPTY_GROUP)
         self.inventory[group]["hosts"].append(host)
@@ -121,6 +118,14 @@ class ConsulInventory:
     def get_node_services(self, node):
         logging.debug("getting services for node: %s", node)
         return self.get_node(node)["Services"]
+
+
+def sanitize(string):
+    # Sanitize string for ansible:
+    # https://docs.ansible.com/ansible/latest/network/getting_started/first_inventory.html
+    # Avoid spaces, hyphens, and preceding numbers (use floor_19, not
+    # 19th_floor) in your group names. Group names are case sensitive.
+    return re.sub(r"[^A-Za-z0-9]", "_", string)
 
 
 def get_node_vars(node):
