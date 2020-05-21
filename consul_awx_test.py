@@ -55,12 +55,27 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
                 "Node": "node3",
                 "TaggedAddresses": {"lan": "10.0.0.2", "wan": "10.0.0.2"},
             },
+            {
+                "Address": "10.0.0.3",
+                "CreateIndex": 14,
+                "Datacenter": "dc1",
+                "ID": "97649a1d-281d-4455-a215-020e7d77eedb",
+                "Meta": {
+                    "consul-network-segment": "",
+                    "cluster": "one-two",
+                    "server_type": "postgresql",
+                },
+                "ModifyIndex": 15,
+                "Node": "node4",
+                "TaggedAddresses": {"lan": "10.0.0.3", "wan": "10.0.0.3"},
+            },
         ],
     )
     mocked_catalog_node.side_effect = [
         ("2345", {"Node": {}, "Services": {"a": {"Meta": {}, "Tags": ["aa"]}}}),
         ("3456", {"Node": {}, "Services": {"b": {"Meta": {}, "Tags": ["bb"]}}}),
         ("4567", {"Node": {}, "Services": {"c": {"Meta": {}, "Tags": ["cc"]}}}),
+        ("5678", {"Node": {}, "Services": {"d-d": {"Meta": {}, "Tags": ["dd"]}}}),
     ]
     c = ConsulInventory()
     c.build_full_inventory()
@@ -89,6 +104,12 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
                     "server_type": "web-server",
                     "pseudo_bool": False,
                 },
+                "node4": {
+                    "ansible_host": "10.0.0.3",
+                    "datacenter": "dc1",
+                    "server_type": "postgresql",
+                    "cluster": "one-two",
+                },
             }
         },
         "a": {"children": ["a_aa"], "hosts": ["node1"]},
@@ -103,6 +124,9 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
                     "c",
                     "c_cc",
                     "cluster_94",
+                    "cluster_one_two",
+                    "d_d",
+                    "d_d_dd",
                     "dc1",
                     "pseudo_bool",
                     "server_type_nginx",
@@ -118,11 +142,14 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
         "c": {"children": ["c_cc"], "hosts": ["node3"]},
         "c_cc": {"children": [], "hosts": ["node3"]},
         "cluster_94": {"children": [], "hosts": ["node1"]},
-        "dc1": {"children": [], "hosts": ["node1", "node2", "node3"]},
+        "cluster_one_two": {"children": [], "hosts": ["node4"]},
+        "d_d": {"children": ["d_d_dd"], "hosts": ["node4"]},
+        "d_d_dd": {"children": [], "hosts": ["node4"]},
+        "dc1": {"children": [], "hosts": ["node1", "node2", "node3", "node4"]},
         "pseudo_bool": {"children": [], "hosts": ["node2"]},
         "server_type_web_server": {"children": [], "hosts": ["node3"]},
         "server_type_nginx": {"children": [], "hosts": ["node2"]},
-        "server_type_postgresql": {"children": [], "hosts": ["node1"]},
+        "server_type_postgresql": {"children": [], "hosts": ["node1", "node4"]},
         "ungrouped": {"children": [], "hosts": []},
     }
 
