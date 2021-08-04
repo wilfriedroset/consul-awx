@@ -35,7 +35,7 @@ EMPTY_INVENTORY = {
 
 class ConsulInventory:
     def __init__(
-        self, host="127.0.0.1", port=8500, token=None, scheme="http", verify=True
+        self, host="127.0.0.1", port=8500, token=None, scheme="http", verify=True, dc=None, cert=None
     ):
 
         if not str2bool(verify):
@@ -44,8 +44,13 @@ class ConsulInventory:
             # warning
             urllib3.disable_warnings()
 
+        # if user specified the param in the configuration file, it will be a Str and not managed later by requests
+        # ex: verify: true
+        if not isinstance(verify, bool):
+            verify = str2bool(verify)
+
         self.consul_api = consul.Consul(
-            host=host, port=port, token=token, scheme=scheme, verify=verify
+            host=host, port=port, token=token, scheme=scheme, verify=verify, dc=dc, cert=cert
         )
 
         self.inventory = copy.deepcopy(EMPTY_INVENTORY)
@@ -237,6 +242,8 @@ def get_client_configuration(config_path=DEFAULT_CONFIG_PATH):
             "scheme": url.scheme,
             "verify": str2bool(os.environ.get("CONSUL_SSL_VERIFY", True)),
             "token": os.environ.get("CONSUL_TOKEN"),
+            "dc": os.environ.get("CONSUL_DC"),
+            "cert": os.environ.get("CONSUL_CERT"),
         }
     elif os.path.isfile(config_path):
         config = configparser.ConfigParser()
