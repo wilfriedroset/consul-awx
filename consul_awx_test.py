@@ -10,7 +10,7 @@ from consul_awx import ConsulInventory, get_node_meta
 @mock.patch("consul.base.Consul.Catalog.node")
 @mock.patch("consul.base.Consul.Catalog.nodes")
 def test_mock(mocked_catalog_nodes, mocked_catalog_node):
-    for tagged_address, ip_prefix in [('lan', '10'), ('wan', '20')]:
+    for tagged_address, ip_prefix in [("lan", "10"), ("wan", "20")]:
         mocked_catalog_nodes.return_value = (
             "2513",
             [
@@ -77,7 +77,7 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
             ("3456", {"Node": {}, "Services": {"b": {"Meta": {}, "Tags": ["bb"]}}}),
             ("4567", {"Node": {}, "Services": {"c": {"Meta": {}, "Tags": ["cc"]}}}),
             ("5678", {"Node": {}, "Services": {"d-d": {"Meta": {}, "Tags": ["dd"]}}}),
-    ]
+        ]
         c = ConsulInventory()
         c.build_full_inventory(tagged_address=tagged_address)
         print(c.inventory)
