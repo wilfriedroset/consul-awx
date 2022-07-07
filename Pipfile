@@ -1,0 +1,14 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+python-consul2 = ">=0.0.16"
+requests = "*"
+tox = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"

@@ -23,6 +23,7 @@ See https://python-consul2.readthedocs.io/en/latest/'"""
 CONFIG = "consul_awx.ini"
 DEFAULT_CONFIG_DIR = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_CONFIG_PATH = os.path.join(DEFAULT_CONFIG_DIR, CONFIG)
+CONSUL_EXPECTED_TAGGED_ADDRESS = ["wan", "wan_ipv4", "lan", "lan_ipv4"]
 
 EMPTY_GROUP = {"hosts": [], "children": []}
 
@@ -35,7 +36,14 @@ EMPTY_INVENTORY = {
 
 class ConsulInventory:
     def __init__(
-        self, host="127.0.0.1", port=8500, token=None, scheme="http", verify=True, dc=None, cert=None
+        self,
+        host="127.0.0.1",
+        port=8500,
+        token=None,
+        scheme="http",
+        verify=True,
+        dc=None,
+        cert=None,
     ):
 
         if not str2bool(verify):
@@ -50,14 +58,22 @@ class ConsulInventory:
             verify = str2bool(verify)
 
         self.consul_api = consul.Consul(
-            host=host, port=port, token=token, scheme=scheme, verify=verify, dc=dc, cert=cert
+            host=host,
+            port=port,
+            token=token,
+            scheme=scheme,
+            verify=verify,
+            dc=dc,
+            cert=cert,
         )
 
         self.inventory = copy.deepcopy(EMPTY_INVENTORY)
 
-    def build_full_inventory(self, node_meta=None):
+    def build_full_inventory(self, node_meta=None, tagged_address="lan"):
         for node in self.get_nodes(node_meta=node_meta):
-            self.inventory["_meta"]["hostvars"][node["Node"]] = get_node_vars(node)
+            self.inventory["_meta"]["hostvars"][node["Node"]] = get_node_vars(
+                node, tagged_address=tagged_address
+            )
             self.add_to_group(node["Datacenter"], node["Node"])
             meta = node.get("Meta", {})
             if meta is None:
@@ -133,8 +149,11 @@ def sanitize(string):
     return re.sub(r"[^A-Za-z0-9]", "_", string)
 
 
-def get_node_vars(node):
-    node_vars = {"ansible_host": node["Address"], "datacenter": node["Datacenter"]}
+def get_node_vars(node, tagged_address):
+    node_vars = {
+        "ansible_host": node["TaggedAddresses"][tagged_address],
+        "datacenter": node["Datacenter"],
+    }
     meta = node.get("Meta", {})
     if meta is None:
         meta = {}
@@ -184,6 +203,13 @@ def cmdline_parser():
         "--datacenter",
         action="store",
         help="Get all inventory about a specific consul datacenter",
+    )
+    parser.add_argument(
+        "--tagged-address",
+        action="store",
+        choices=CONSUL_EXPECTED_TAGGED_ADDRESS,
+        # Let's not define an default value this will be handled in the main
+        help="Which tagged address to use as ansible_host",
     )
 
     parser.add_argument("--indent", type=int, default=4)
@@ -293,13 +319,23 @@ def main():
     consul_config = get_client_configuration(args.path)
 
     c = ConsulInventory(**consul_config)
+    tagged_address = args.tagged_address or os.environ.get(
+        "CONSUL_TAGGED_ADDRESS", "lan"
+    )
+    if tagged_address not in CONSUL_EXPECTED_TAGGED_ADDRESS:
+        logging.debug("Got %s as consul tagged address", tagged_address)
+        logging.fatal(
+            "Invalid tagged_address provided must be in: %s",
+            ", ".join(CONSUL_EXPECTED_TAGGED_ADDRESS),
+        )
+        sys.exit(1)
 
     try:
         if args.host:
-            result = get_node_vars(c.get_node(args.host)["Node"])
+            result = get_node_vars(c.get_node(args.host)["Node"], tagged_address)
         else:
             node_meta = get_node_meta(args.path)
-            c.build_full_inventory(node_meta)
+            c.build_full_inventory(node_meta, tagged_address)
             result = c.inventory
     except ConnectionError as err:
         logging.debug(str(err))
