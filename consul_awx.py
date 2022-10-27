@@ -69,7 +69,9 @@ class ConsulInventory:
 
         self.inventory = copy.deepcopy(EMPTY_INVENTORY)
 
-    def build_full_inventory(self, node_meta=None, tagged_address="lan"):
+    def build_full_inventory(
+        self, node_meta=None, node_meta_types=None, tagged_address="lan"
+    ):
         for node in self.get_nodes(node_meta=node_meta):
             self.inventory["_meta"]["hostvars"][node["Node"]] = get_node_vars(
                 node, tagged_address=tagged_address
@@ -83,10 +85,17 @@ class ConsulInventory:
                 if not value:
                     continue
 
-                try:
-                    value = str2bool(value.strip())
-                except ValueError:
-                    pass
+                # Keep from converting some values to boolean
+                # So a valid value of 1 or 0 is kept as is
+                convert_to_bool = True
+                if node_meta_types and key in node_meta_types:
+                    convert_to_bool = False
+
+                if convert_to_bool:
+                    try:
+                        value = str2bool(value.strip())
+                    except ValueError:
+                        pass
                 # Meta can only be string but we can pseudo support bool
                 # We don't want groups named <osef>_false because by convention
                 # this means the host is *not* in the group
@@ -314,6 +323,39 @@ def get_node_meta(config_path=None):
     return node_meta
 
 
+def get_node_meta_types(config_path=None):
+    node_meta_types = None
+    if "CONSUL_NODE_META_TYPES" in os.environ:
+        try:
+            node_meta_types = json.loads(os.environ["CONSUL_NODE_META_TYPES"])
+
+            assert isinstance(node_meta_types, dict)  # node_meta_types must be dict
+            assert all(
+                isinstance(x, str) for x in node_meta_types.keys()
+            )  # all keys must be string
+            assert all(
+                isinstance(x, str) for x in node_meta_types.values()
+            )  # all values must be string
+
+        except (json.decoder.JSONDecodeError) as err:
+            logging.fatal(str(err))
+            raise json.decoder.JSONDecodeError("failed to load CONSUL_NODE_META_TYPES")
+        except AssertionError:
+            raise Exception(
+                "Invalid node_meta_types filter. Content must be dict with keys and values as string"
+            )
+    elif config_path and os.path.isfile(config_path):
+        config = configparser.ConfigParser()
+        config.read(config_path)
+        if config.has_section("consul_node_meta_types"):
+            node_meta_types = dict(config.items("consul_node_meta_types"))
+    else:
+        logging.debug(
+            "No envvar nor configuration file, will not use node_meta_types to filter"
+        )
+    return node_meta_types
+
+
 def main():
     args = cmdline_parser()
     consul_config = get_client_configuration(args.path)
@@ -335,7 +377,8 @@ def main():
             result = get_node_vars(c.get_node(args.host)["Node"], tagged_address)
         else:
             node_meta = get_node_meta(args.path)
-            c.build_full_inventory(node_meta, tagged_address)
+            node_meta_types = get_node_meta_types(args.path)
+            c.build_full_inventory(node_meta, node_meta_types, tagged_address)
             result = c.inventory
     except ConnectionError as err:
         logging.debug(str(err))
