@@ -217,17 +217,13 @@ def test_get_node_meta_configfile():
     with tempfile.NamedTemporaryFile() as fp:
         fp.write(b"[consul_node_meta]\nk1:v1")
         fp.seek(0)
-        print(dir(fp))
-        print(fp.name)
         path = fp.name
         assert get_node_meta(path) == {"k1": "v1"}
 
 
 def test_get_node_meta_types_configfile():
     with tempfile.NamedTemporaryFile() as fp:
-        fp.write(b"[consul_node_meta_types]\ncluster:skip_bool")
+        fp.write(b"[consul_node_meta_types]\ncluster:str")
         fp.seek(0)
-        print(dir(fp))
-        print(fp.name)
         path = fp.name
-        assert get_node_meta_types(path) == {"cluster": "skip_bool"}
+        assert get_node_meta_types(path) == {"cluster": "str"}

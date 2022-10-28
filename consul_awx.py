@@ -87,11 +87,7 @@ class ConsulInventory:
 
                 # Keep from converting some values to boolean
                 # So a valid value of 1 or 0 is kept as is
-                convert_to_bool = True
-                if node_meta_types and key in node_meta_types:
-                    convert_to_bool = False
-
-                if convert_to_bool:
+                if not (node_meta_types and key in node_meta_types):
                     try:
                         value = str2bool(value.strip())
                     except ValueError:
