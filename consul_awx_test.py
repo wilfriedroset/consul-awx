@@ -4,7 +4,7 @@ from pprint import pprint as print
 from unittest import mock
 
 import pytest
-from consul_awx import ConsulInventory, get_node_meta
+from consul_awx import ConsulInventory, get_node_meta, get_node_meta_types
 
 
 @mock.patch("consul.base.Consul.Catalog.node")
@@ -70,6 +70,20 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
                     "Node": "node4",
                     "TaggedAddresses": {"lan": "10.0.0.3", "wan": "20.0.0.3"},
                 },
+                {
+                    "Address": "10.0.0.4",
+                    "CreateIndex": 16,
+                    "Datacenter": "dc1",
+                    "ID": "0f81eddd-3a0f-4168-8493-a06d2b2de2e8",
+                    "Meta": {
+                        "consul-network-segment": "",
+                        "cluster": "1",
+                        "server_type": "postgresql",
+                    },
+                    "ModifyIndex": 17,
+                    "Node": "node5",
+                    "TaggedAddresses": {"lan": "10.0.0.4", "wan": "20.0.0.4"},
+                },
             ],
         )
         mocked_catalog_node.side_effect = [
@@ -77,9 +91,13 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
             ("3456", {"Node": {}, "Services": {"b": {"Meta": {}, "Tags": ["bb"]}}}),
             ("4567", {"Node": {}, "Services": {"c": {"Meta": {}, "Tags": ["cc"]}}}),
             ("5678", {"Node": {}, "Services": {"d-d": {"Meta": {}, "Tags": ["dd"]}}}),
+            ("6789", {"Node": {}, "Services": {"e": {"Meta": {}, "Tags": ["ee"]}}}),
         ]
+        node_meta_types = {"cluster": "str"}
         c = ConsulInventory()
-        c.build_full_inventory(tagged_address=tagged_address)
+        c.build_full_inventory(
+            tagged_address=tagged_address, node_meta_types=node_meta_types
+        )
         print(c.inventory)
 
         mocked_catalog_nodes.call_count == 1
@@ -111,6 +129,12 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
                         "server_type": "postgresql",
                         "cluster": "one-two",
                     },
+                    "node5": {
+                        "ansible_host": "{}.0.0.4".format(ip_prefix),
+                        "datacenter": "dc1",
+                        "server_type": "postgresql",
+                        "cluster": 1,
+                    },
                 }
             },
             "a": {"children": ["a_aa"], "hosts": ["node1"]},
@@ -124,11 +148,14 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
                         "b_bb",
                         "c",
                         "c_cc",
+                        "cluster_1",
                         "cluster_94",
                         "cluster_one_two",
                         "d_d",
                         "d_d_dd",
                         "dc1",
+                        "e",
+                        "e_ee",
                         "pseudo_bool",
                         "server_type_nginx",
                         "server_type_postgresql",
@@ -144,13 +171,22 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
             "c_cc": {"children": [], "hosts": ["node3"]},
             "cluster_94": {"children": [], "hosts": ["node1"]},
             "cluster_one_two": {"children": [], "hosts": ["node4"]},
+            "cluster_1": {"children": [], "hosts": ["node5"]},
             "d_d": {"children": ["d_d_dd"], "hosts": ["node4"]},
             "d_d_dd": {"children": [], "hosts": ["node4"]},
-            "dc1": {"children": [], "hosts": ["node1", "node2", "node3", "node4"]},
+            "dc1": {
+                "children": [],
+                "hosts": ["node1", "node2", "node3", "node4", "node5"],
+            },
+            "e": {"children": ["e_ee"], "hosts": ["node5"]},
+            "e_ee": {"children": [], "hosts": ["node5"]},
             "pseudo_bool": {"children": [], "hosts": ["node2"]},
             "server_type_web_server": {"children": [], "hosts": ["node3"]},
             "server_type_nginx": {"children": [], "hosts": ["node2"]},
-            "server_type_postgresql": {"children": [], "hosts": ["node1", "node4"]},
+            "server_type_postgresql": {
+                "children": [],
+                "hosts": ["node1", "node4", "node5"],
+            },
             "ungrouped": {"children": [], "hosts": []},
         }
 
@@ -166,11 +202,28 @@ def test_get_node_meta_envvar():
     del os.environ["CONSUL_NODE_META"]
 
 
+def test_get_node_meta_types_envvar():
+    assert get_node_meta_types() is None
+    os.environ["CONSUL_NODE_META_TYPES"] = '{"foo": "int"}'
+    assert get_node_meta_types() == {"foo": "int"}
+    for wrong_value in ['{"foo": 1}', '{1: "int"}', "not a dict"]:
+        with pytest.raises(Exception):
+            os.environ["CONSUL_NODE_META_TYPES"] = wrong_value
+            get_node_meta_types()
+    del os.environ["CONSUL_NODE_META_TYPES"]
+
+
 def test_get_node_meta_configfile():
     with tempfile.NamedTemporaryFile() as fp:
         fp.write(b"[consul_node_meta]\nk1:v1")
         fp.seek(0)
-        print(dir(fp))
-        print(fp.name)
         path = fp.name
         assert get_node_meta(path) == {"k1": "v1"}
+
+
+def test_get_node_meta_types_configfile():
+    with tempfile.NamedTemporaryFile() as fp:
+        fp.write(b"[consul_node_meta_types]\ncluster:str")
+        fp.seek(0)
+        path = fp.name
+        assert get_node_meta_types(path) == {"cluster": "str"}
