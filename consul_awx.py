@@ -377,8 +377,7 @@ def main():
             c.build_full_inventory(node_meta, node_meta_types, tagged_address)
             result = c.inventory
     except ConnectionError as err:
-        logging.debug(str(err))
-        logging.fatal("Failed to connect to consul")
+        logging.fatal("Failed to connect to consul: %s", str(err))
         sys.exit(1)
 
     print(json.dumps(result, sort_keys=True, indent=args.indent))
