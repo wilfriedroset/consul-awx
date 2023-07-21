@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import sys
+import time
 from urllib.parse import urlparse
 
 import urllib3
@@ -242,8 +243,22 @@ def cmdline_parser():
         "--quiet",
         help="Be quiet",
         action="store_const",
-        dest="loglevel",
         const=logging.CRITICAL,
+    )
+
+    parser.add_argument(
+        "-r",
+        "--retry-count",
+        help="Retry count",
+        type=int,
+        default=3,
+    )
+
+    parser.add_argument(
+        "--retry-delay",
+        help="Retry delay in seconds",
+        type=int,
+        default=10,
     )
 
     args = parser.parse_args()
@@ -368,16 +383,21 @@ def main():
         )
         sys.exit(1)
 
-    try:
-        if args.host:
-            result = get_node_vars(c.get_node(args.host)["Node"], tagged_address)
-        else:
-            node_meta = get_node_meta(args.path)
-            node_meta_types = get_node_meta_types(args.path)
-            c.build_full_inventory(node_meta, node_meta_types, tagged_address)
-            result = c.inventory
-    except ConnectionError as err:
-        logging.fatal("Failed to connect to consul: %s", str(err))
+    for i in range(0, args.retry_count):
+        try:
+            if args.host:
+                result = get_node_vars(c.get_node(args.host)["Node"], tagged_address)
+            else:
+                node_meta = get_node_meta(args.path)
+                node_meta_types = get_node_meta_types(args.path)
+                c.build_full_inventory(node_meta, node_meta_types, tagged_address)
+                result = c.inventory
+        except ConnectionError as err:
+            logging.error("Failed to connect to consul: %s", str(err))
+            logging.error("Waiting %ds before retry %d/%d", args.retry_delay, i, args.retry_count)
+            time.sleep(args.retry_delay)
+    else:
+        logging.fatal("Number of retries exhausted")
         sys.exit(1)
 
     print(json.dumps(result, sort_keys=True, indent=args.indent))
