@@ -396,6 +396,8 @@ def main():
             logging.error("Failed to connect to consul: %s", str(err))
             logging.error("Waiting %ds before retry %d/%d", args.retry_delay, i, args.retry_count)
             time.sleep(args.retry_delay)
+            continue
+        break
     else:
         logging.fatal("Number of retries exhausted")
         sys.exit(1)
