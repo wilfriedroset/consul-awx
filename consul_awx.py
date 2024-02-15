@@ -75,7 +75,7 @@ class ConsulInventory:
     ):
         for node in self.get_nodes(node_meta=node_meta):
             self.inventory["_meta"]["hostvars"][node["Node"]] = get_node_vars(
-                node, tagged_address=tagged_address
+                node, tagged_address=tagged_address, node_meta_types=node_meta_types
             )
             self.add_to_group(node["Datacenter"], node["Node"])
             meta = node.get("Meta", {})
@@ -155,7 +155,7 @@ def sanitize(string):
     return re.sub(r"[^A-Za-z0-9]", "_", string)
 
 
-def get_node_vars(node, tagged_address):
+def get_node_vars(node, tagged_address, node_meta_types=None):
     node_vars = {
         "ansible_host": node["TaggedAddresses"][tagged_address],
         "datacenter": node["Datacenter"],
@@ -169,12 +169,15 @@ def get_node_vars(node, tagged_address):
             continue
         v = v.strip()
 
-        if v.isdigit():
-            node_vars[k] = int(v)
-        elif v.lower() == "true":
-            node_vars[k] = True
-        elif v.lower() == "false":
-            node_vars[k] = False
+        if not (node_meta_types and k in node_meta_types):
+            if v.isdigit():
+                node_vars[k] = int(v)
+            elif v.lower() == "true":
+                node_vars[k] = True
+            elif v.lower() == "false":
+                node_vars[k] = False
+            else:
+                node_vars[k] = v
         else:
             node_vars[k] = v
 
