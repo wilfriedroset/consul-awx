@@ -109,7 +109,7 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
                         "ansible_host": "{}.0.0.0".format(ip_prefix),
                         "datacenter": "dc1",
                         "server_type": "postgresql",
-                        "cluster": 94,
+                        "cluster": "94",
                     },
                     "node2": {
                         "ansible_host": "{}.0.0.1".format(ip_prefix),
@@ -133,7 +133,7 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
                         "ansible_host": "{}.0.0.4".format(ip_prefix),
                         "datacenter": "dc1",
                         "server_type": "postgresql",
-                        "cluster": 1,
+                        "cluster": "1",
                     },
                 }
             },
@@ -227,3 +227,4 @@ def test_get_node_meta_types_configfile():
         fp.seek(0)
         path = fp.name
         assert get_node_meta_types(path) == {"cluster": "str"}
+
