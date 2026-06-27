@@ -273,12 +273,12 @@
         },
         "tox": {
             "hashes": [
-                "sha256:0678fbf26dd5b559b1ef128fa4388325920219322ebc8cc5f3497627c00f4472",
-                "sha256:e2084be6dfdef96ba1bed4948e6a1f73613d6952e1477be5dca45653d4c053c8"
+                "sha256:4d06b925c4dd67872099b39c5a46fba79a2169c5f6e32060f95a8b1181f0ef55",
+                "sha256:db1c2610802553189cf40de251661d066a635ee0ed9bf2a60093b5f1a7f36ef8"
             ],
             "index": "pypi",
             "markers": "python_version >= '3.10'",
-            "version": "==4.55.1"
+            "version": "==4.56.1"
         },
         "urllib3": {
             "hashes": [
@@ -290,11 +290,11 @@
         },
         "virtualenv": {
             "hashes": [
-                "sha256:8f7c38605023688c89789f566959006af6d61c99eeeb9e58342eb780c5761e5e",
-                "sha256:98847aadf5e2037e0e4d2e19528eb3aca6f23906422e59a510bff231a6d32fce"
+                "sha256:55aa670b67bbfb991b03fda39bd3276d92c419d702376e98c5df1c9989a26783",
+                "sha256:dca3bf98275a59c652b69d68e73433e597d977c2da9198882479d1a7188009c8"
             ],
             "markers": "python_version >= '3.9'",
-            "version": "==21.5.0"
+            "version": "==21.5.1"
         }
     },
     "develop": {}
