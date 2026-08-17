@@ -1,9 +1,0 @@
----
-language: python
-python:
-  - "3.12"
-install:
-  - pip install -q tox pre-commit
-script:
-  - pre-commit
-  - tox
