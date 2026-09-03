@@ -15,6 +15,14 @@ from requests.exceptions import ConnectionError
 
 try:
     import consul
+    from consul.base import (
+        ACLDisabled,
+        ACLPermissionDenied,
+        BadRequest,
+        ClientError,
+        ConsulException,
+        NotFound,
+    )
 except ImportError:
     sys.exit(
         """failed=True msg='python-consul2 required for this module.
@@ -25,6 +33,16 @@ CONFIG = "consul_awx.ini"
 DEFAULT_CONFIG_DIR = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_CONFIG_PATH = os.path.join(DEFAULT_CONFIG_DIR, CONFIG)
 CONSUL_EXPECTED_TAGGED_ADDRESS = ["wan", "wan_ipv4", "lan", "lan_ipv4"]
+
+# Consul raises a bare ConsulException on 5xx and these subclasses on 4xx, only
+# the former is worth a retry
+CONSUL_CLIENT_ERRORS = (
+    ACLDisabled,
+    ACLPermissionDenied,
+    BadRequest,
+    ClientError,
+    NotFound,
+)
 
 EMPTY_GROUP = {"hosts": [], "children": []}
 
@@ -73,6 +91,8 @@ class ConsulInventory:
     def build_full_inventory(
         self, node_meta=None, node_meta_types=None, tagged_address="lan"
     ):
+        # A retried build must not append to what the failed one left behind
+        self.inventory = copy.deepcopy(EMPTY_INVENTORY)
         for node in self.get_nodes(node_meta=node_meta):
             self.inventory["_meta"]["hostvars"][node["Node"]] = get_node_vars(
                 node, tagged_address=tagged_address, node_meta_types=node_meta_types
@@ -386,7 +406,7 @@ def main():
         )
         sys.exit(1)
 
-    for i in range(0, args.retry_count):
+    for attempt in range(1, args.retry_count + 1):
         try:
             if args.host:
                 result = get_node_vars(c.get_node(args.host)["Node"], tagged_address)
@@ -395,12 +415,19 @@ def main():
                 node_meta_types = get_node_meta_types(args.path)
                 c.build_full_inventory(node_meta, node_meta_types, tagged_address)
                 result = c.inventory
-        except ConnectionError as err:
-            logging.error("Failed to connect to consul: %s", str(err))
-            logging.error("Waiting %ds before retry %d/%d", args.retry_delay, i, args.retry_count)
-            time.sleep(args.retry_delay)
-            continue
-        break
+            break
+        except CONSUL_CLIENT_ERRORS:
+            raise
+        except (ConnectionError, ConsulException) as err:
+            logging.warning("Failed to query consul: %s", str(err))
+            if attempt < args.retry_count:
+                logging.warning(
+                    "Waiting %ds before retry %d/%d",
+                    args.retry_delay,
+                    attempt + 1,
+                    args.retry_count,
+                )
+                time.sleep(args.retry_delay)
     else:
         logging.fatal("Number of retries exhausted")
         sys.exit(1)

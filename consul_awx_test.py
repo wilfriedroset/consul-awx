@@ -1,10 +1,28 @@
+import copy
+import io
 import os
+import sys
 import tempfile
+from contextlib import redirect_stdout
 from pprint import pprint as print
 from unittest import mock
 
+import consul
 import pytest
-from consul_awx import ConsulInventory, get_node_meta, get_node_meta_types
+from consul_awx import ConsulInventory, get_node_meta, get_node_meta_types, main
+
+NODE = {
+    "Address": "10.0.0.0",
+    "CreateIndex": 7,
+    "Datacenter": "dc1",
+    "ID": "517ef51b-7ac0-91ff-76f3-8e2ca17e714e",
+    "Meta": {"server_type": "postgresql"},
+    "ModifyIndex": 12,
+    "Node": "node1",
+    "TaggedAddresses": {"lan": "10.0.0.0", "wan": "20.0.0.0"},
+}
+
+NODE_SERVICES = ("2345", {"Node": {}, "Services": {"a": {"Meta": {}, "Tags": ["aa"]}}})
 
 
 @mock.patch("consul.base.Consul.Catalog.node")
@@ -189,6 +207,77 @@ def test_mock(mocked_catalog_nodes, mocked_catalog_node):
             },
             "ungrouped": {"children": [], "hosts": []},
         }
+
+
+@mock.patch("consul.base.Consul.Catalog.node")
+@mock.patch("consul.base.Consul.Catalog.nodes")
+def test_build_full_inventory_starts_from_a_clean_state(
+    mocked_catalog_nodes, mocked_catalog_node
+):
+    mocked_catalog_nodes.return_value = ("2513", [NODE])
+    mocked_catalog_node.return_value = NODE_SERVICES
+
+    c = ConsulInventory()
+    c.build_full_inventory()
+    first_run = copy.deepcopy(c.inventory)
+    c.build_full_inventory()
+
+    assert c.inventory == first_run
+
+
+def run_main(argv):
+    with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(
+        sys, "argv", ["consul_awx.py", "--path", "/nonexistent"] + argv
+    ), redirect_stdout(io.StringIO()) as stdout:
+        main()
+    return stdout.getvalue()
+
+
+@mock.patch("consul_awx.time.sleep")
+@mock.patch("consul.base.Consul.Catalog.node")
+@mock.patch("consul.base.Consul.Catalog.nodes")
+def test_main_retries_on_consul_server_error(
+    mocked_catalog_nodes, mocked_catalog_node, mocked_sleep
+):
+    mocked_catalog_nodes.side_effect = [
+        consul.base.ConsulException(
+            "500 rpc error getting client: failed to get conn: "
+            "write tcp 127.0.0.1:42434->127.0.0.1:8300: write: connection reset by peer"
+        ),
+        ("2513", [NODE]),
+    ]
+    mocked_catalog_node.return_value = NODE_SERVICES
+
+    output = run_main(["--list", "--retry-count", "3"])
+
+    assert mocked_catalog_nodes.call_count == 2
+    assert '"node1"' in output
+
+
+@mock.patch("consul_awx.time.sleep")
+@mock.patch("consul.base.Consul.Catalog.nodes")
+def test_main_exits_when_retries_are_exhausted(mocked_catalog_nodes, mocked_sleep):
+    mocked_catalog_nodes.side_effect = consul.base.ConsulException("500 rpc error")
+
+    with pytest.raises(SystemExit):
+        run_main(["--list", "--retry-count", "2"])
+
+    assert mocked_catalog_nodes.call_count == 2
+    assert mocked_sleep.call_count == 1
+
+
+@mock.patch("consul_awx.time.sleep")
+@mock.patch("consul.base.Consul.Catalog.nodes")
+def test_main_does_not_retry_on_consul_client_error(mocked_catalog_nodes, mocked_sleep):
+    mocked_catalog_nodes.side_effect = consul.base.ACLPermissionDenied(
+        "Permission denied"
+    )
+
+    with pytest.raises(consul.base.ACLPermissionDenied):
+        run_main(["--list", "--retry-count", "3"])
+
+    assert mocked_catalog_nodes.call_count == 1
+    assert mocked_sleep.call_count == 0
 
 
 def test_get_node_meta_envvar():
