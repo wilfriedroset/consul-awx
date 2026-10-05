@@ -9,7 +9,13 @@ from unittest import mock
 
 import consul
 import pytest
-from consul_awx import ConsulInventory, get_node_meta, get_node_meta_types, main
+from consul_awx import (
+    ConsulInventory,
+    get_node_meta,
+    get_node_meta_types,
+    main,
+    get_node_meta_filters,
+)
 
 NODE = {
     "Address": "10.0.0.0",
@@ -317,3 +323,10 @@ def test_get_node_meta_types_configfile():
         path = fp.name
         assert get_node_meta_types(path) == {"cluster": "str"}
 
+
+def test_get_node_meta_filters_configfile():
+    with tempfile.NamedTemporaryFile() as fp:
+        fp.write(b'[consul_node_meta_filters]\nfilters=["test"]')
+        fp.seek(0)
+        path = fp.name
+        assert get_node_meta_filters(path) == ["test"]
