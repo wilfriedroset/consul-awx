@@ -89,7 +89,11 @@ class ConsulInventory:
         self.inventory = copy.deepcopy(EMPTY_INVENTORY)
 
     def build_full_inventory(
-        self, node_meta=None, node_meta_types=None, node_meta_filters=[], tagged_address="lan"
+        self,
+        node_meta=None,
+        node_meta_types=None,
+        node_meta_filters=[],
+        tagged_address="lan",
     ):
         # A retried build must not append to what the failed one left behind
         self.inventory = copy.deepcopy(EMPTY_INVENTORY)
@@ -395,29 +399,33 @@ def get_node_meta_types(config_path=None):
 def get_node_meta_filters(config_path=None):
     node_meta_filters = []
     if "CONSUL_NODE_META_FILTERS" in os.environ:
-            try:
-                env_filters = os.environ.get("CONSUL_NODE_META_FILTERS")
-                if env_filters:
-                    node_meta_filters = json.loads(os.environ.get("CONSUL_NODE_META_FILTERS"))
-
-                assert isinstance(node_meta_filters, list)
-                assert all(
-                    isinstance(x, str) for x in node_meta_filters
+        try:
+            env_filters = os.environ.get("CONSUL_NODE_META_FILTERS")
+            if env_filters:
+                node_meta_filters = json.loads(
+                    os.environ.get("CONSUL_NODE_META_FILTERS")
                 )
 
-            except (json.decoder.JSONDecodeError, AssertionError) as err:
-                raise Exception(
-                    f"Invalid node_meta_filters. Content must be a list with items as string, error: {err}"
-                )
+            assert isinstance(node_meta_filters, list)
+            assert all(isinstance(x, str) for x in node_meta_filters)
+
+        except (json.decoder.JSONDecodeError, AssertionError) as err:
+            raise Exception(
+                f"Invalid node_meta_filters. Content must be a list with items as string, error: {err}"
+            )
     elif config_path and os.path.isfile(config_path):
         config = configparser.ConfigParser()
         config.read(config_path)
         if config.has_section("consul_node_meta_filters"):
             try:
-                node_meta_filters = json.loads(config["consul_node_meta_filters"]["filters"])
+                node_meta_filters = json.loads(
+                    config["consul_node_meta_filters"]["filters"]
+                )
                 assert isinstance(node_meta_filters, list)
             except (KeyError, AssertionError) as e:
-                raise Exception(f"invalid 'consul_node_meta_filters' configuration in config file, error: {e}")
+                raise Exception(
+                    f"invalid 'consul_node_meta_filters' configuration in config file, error: {e}"
+                )
         else:
             logging.debug(
                 "No envvar nor configuration file, will not use consul_node_meta_filters to filter"
@@ -449,7 +457,9 @@ def main():
                 node_meta = get_node_meta(args.path)
                 node_meta_types = get_node_meta_types(args.path)
                 node_meta_filters = get_node_meta_filters(args.path)
-                c.build_full_inventory(node_meta, node_meta_types, node_meta_filters, tagged_address)
+                c.build_full_inventory(
+                    node_meta, node_meta_types, node_meta_filters, tagged_address
+                )
                 result = c.inventory
             break
         except CONSUL_CLIENT_ERRORS:

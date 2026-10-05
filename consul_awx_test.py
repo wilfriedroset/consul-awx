@@ -326,7 +326,7 @@ def test_get_node_meta_types_configfile():
 
 def test_get_node_meta_filters_configfile():
     with tempfile.NamedTemporaryFile() as fp:
-        fp.write(b"[consul_node_meta_filters]\nfilters=[\"test\"]")
+        fp.write(b'[consul_node_meta_filters]\nfilters=["test"]')
         fp.seek(0)
         path = fp.name
         assert get_node_meta_filters(path) == ["test"]
